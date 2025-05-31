@@ -130,14 +130,17 @@ def create_distribution_chart(df, name):
 
     ax.set_title(f'{name} Distribution by Cohort', pad=20)
     ax.set_xlabel(f'{name}', labelpad=15)
-    ax.set_ylabel('Head Count', labelpad=15)    # Adding value labels and percentages on top of each bar with larger font size
+    ax.set_ylabel('Head Count', labelpad=15)    # Adding value labels and percentages with staggered positioning to avoid overlap
     for container_idx, container in enumerate(ax.containers):
         labels = []
         for bar_idx, bar in enumerate(container):
             count = bar.get_height()
             percentage = df_melted.iloc[container_idx*2+bar_idx if container_idx < 2 else bar_idx]['Percentage']
             labels.append(f'{int(count)}\n({percentage:.1f}%)')
-        ax.bar_label(container, labels=labels, padding=10, fontsize=14, fontweight='bold')
+        
+        # Use different padding for each container to stagger labels
+        padding = 8 if container_idx % 2 == 0 else 18
+        ax.bar_label(container, labels=labels, padding=padding, fontsize=13, fontweight='bold')
 
     # Enhance grid for better readability
     ax.grid(axis='y', linestyle='--', alpha=0.7)
@@ -170,13 +173,11 @@ def create_kpi_performance_chart(df, name):
 
     # Create shorter column names for display
     col4_short = "Cumulative Combined KPI"
-    col8_short = "Cumulative KPI 1"
-
-    # Create a DataFrame with the data and specified columns
+    col8_short = "Cumulative KPI 1"    # Create a DataFrame with the data and specified columns, multiplying KPI values by 100 to show as percentages
     kpi_data = pd.DataFrame({
         'Category': df['Category'],
-        col4_short: df[col4],
-        col8_short: df[col8]
+        col4_short: df[col4] * 100,  # Multiply by 100 to convert to percentage
+        col8_short: df[col8] * 100   # Multiply by 100 to convert to percentage
     })
 
     # Reshape data for seaborn
@@ -184,7 +185,7 @@ def create_kpi_performance_chart(df, name):
                          id_vars=['Category'], 
                          value_vars=[col4_short, col8_short],
                          var_name='KPI Type', 
-                         value_name='Achievement %')    
+                         value_name='Achievement %')
     
     # Using seaborn barplot with grouped bars
     bars = sns.barplot(x='Category', y='Achievement %', hue='KPI Type', 
@@ -194,13 +195,25 @@ def create_kpi_performance_chart(df, name):
 
     ax.set_title(f'KPI Performance by {name} CAP LRM', pad=20)
     ax.set_xlabel(f'{name}', labelpad=15)
-    ax.set_ylabel('Achievement %', labelpad=15)    # Adding value labels on top of each bar with larger font size
+    ax.set_ylabel('Achievement %', labelpad=15)    # Adding value labels with staggered positioning and improved formatting to avoid overlap
     for container_idx, container in enumerate(ax.containers):
         labels = []
         for bar in container:
             height = bar.get_height()
-            labels.append(f'{height:.2f}%')
-        ax.bar_label(container, labels=labels, padding=10, fontsize=14, fontweight='bold')
+            # Format with no decimal places now that we've multiplied by 100
+            labels.append(f'{height:.0f}%')
+            
+        # Use different padding for alternating container groups
+        padding = 8 if container_idx % 2 == 0 else 18
+        ax.bar_label(container, labels=labels, padding=padding, fontsize=13, fontweight='bold')
+        
+        # For second container, adjust y-position of labels by manually adding text
+        if container_idx % 2 != 0:
+            for j, bar in enumerate(container):
+                # Create additional text objects at different positions
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2, height + 5, 
+                        labels[j], ha='center', fontsize=13, fontweight='bold')
 
     # Enhance grid for better readability
     ax.grid(axis='y', linestyle='--', alpha=0.7)
@@ -292,13 +305,15 @@ def create_performance_multiple_chart(df, name):
 
     ax.set_title(f'Performance Multiple by {name}', pad=20)
     ax.set_xlabel(f'{name}', labelpad=15)
-    ax.set_ylabel('Multiple Value', labelpad=15)    # Adding value labels on top of each bar with larger font size
+    ax.set_ylabel('Multiple Value', labelpad=15)    # Adding value labels with staggered positioning to avoid overlap
     for container_idx, container in enumerate(ax.containers):
         labels = []
         for bar in container:
             height = bar.get_height()
             labels.append(f'{height:.1f}x')
-        ax.bar_label(container, labels=labels, padding=10, fontsize=14, fontweight='bold')
+        # Staggered padding for alternating container groups
+        padding = 8 if container_idx % 2 == 0 else 18
+        ax.bar_label(container, labels=labels, padding=padding, fontsize=13, fontweight='bold')
 
     # Enhance grid for better readability
     ax.grid(axis='y', linestyle='--', alpha=0.7)
