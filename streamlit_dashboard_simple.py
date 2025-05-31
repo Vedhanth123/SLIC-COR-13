@@ -15,7 +15,15 @@ def main():    # Set page configuration
         layout="wide"
     )
     
-    st.markdown("<h1 style='text-align: center; font-weight: 800; color: #0047AB; margin-bottom: 30px; font-size: 46px;'>HDFC Analysis Dashboard</h1>", unsafe_allow_html=True)
+    st.markdown("""
+        <div style='text-align: center; margin-bottom: 40px;'>
+            <h1 style='font-weight: 800; color: #0047AB; font-size: 46px; margin-bottom: 10px; text-shadow: 1px 1px 3px rgba(0,0,0,0.2);'>
+                HDFC Analysis Dashboard
+            </h1>
+            <div style='width: 100px; height: 5px; background-color: #0047AB; margin: 0 auto 10px auto; border-radius: 2px;'></div>
+            <p style='color: #555; font-size: 18px; font-weight: 500;'>Executive Summary Report</p>
+        </div>
+    """, unsafe_allow_html=True)
     
     # Load all dataframes
     with st.spinner('Loading data from HDFC_modified.xlsx...'):
@@ -55,19 +63,21 @@ def main():    # Set page configuration
 
 def create_dashboard(df, name):
     """Create a dashboard visualization for the given dataframe in Streamlit."""
-    st.markdown(f"<h1 style='text-align: center; font-weight: 700; color: #1E3A8A;'>{name} Analysis Dashboard</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h1 style='text-align: center; font-weight: 800; color: #0A2472; margin-bottom: 20px; text-shadow: 1px 1px 2px #ccc;'>{name} Analysis Dashboard</h1>", unsafe_allow_html=True)
     
-    # Show information about the data
-    st.markdown(f"<h3 style='text-align: center;'>Dataset contains {len(df)} rows</h3>", unsafe_allow_html=True)
+    # Show information about the data with improved styling
+    st.markdown(f"<h3 style='text-align: center; color: #444; background-color: #f8f9fa; padding: 10px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>Executive Dashboard • {len(df)} Data Points</h3>", unsafe_allow_html=True)
     
-    # Enable user to select which charts to display
+    # Enable user to select which charts to display with improved styling
+    st.markdown("<div style='background-color: #f0f2f6; padding: 15px; border-radius: 10px; margin-bottom: 20px;'>", unsafe_allow_html=True)
     selected_charts = st.multiselect(
-        'Select charts to display:',
+        '📊 Select visualizations to display:',
         ['Distribution', 'KPI Performance', 'Performance Multiple', 
          'Top vs Bottom Performers', 'Time to First Sale', 'CAR2CATPO Ratio',
          'Attrition Count', 'Average Residency', 'Infant Attrition'],
         default=['Distribution', 'KPI Performance', 'Performance Multiple']
     )
+    st.markdown("</div>", unsafe_allow_html=True)
     
     # Create a list of chart creation functions
     chart_functions = {
@@ -85,8 +95,7 @@ def create_dashboard(df, name):
     # Determine how many rows we need (3 charts per row)
     num_charts = len(selected_charts)
     num_rows = (num_charts + 2) // 3  # Integer division rounded up
-    
-    # Create each row of charts
+      # Create each row of charts
     for row in range(num_rows):
         # Create columns for this row
         cols = st.columns(3)
@@ -99,8 +108,15 @@ def create_dashboard(df, name):
                 with cols[col_idx]:
                     try:
                         with st.container():
-                            st.markdown(f"<h2 style='text-align: center; font-weight: 600; color: #333; background-color: #f0f2f6; padding: 10px; border-radius: 5px;'>{chart_name}</h2>", unsafe_allow_html=True)
+                            st.markdown(f"""
+                                <div style='border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
+                                    <h2 style='text-align: center; font-weight: 700; color: #0A2472; background-color: #f0f2f6; 
+                                    padding: 15px; margin: 0; border-bottom: 2px solid #e0e0e0;'>
+                                    {chart_name}</h2>
+                                    <div style='padding: 10px 0;'>
+                            """, unsafe_allow_html=True)
                             chart_functions[chart_name](df, name)
+                            st.markdown("</div></div>", unsafe_allow_html=True)
                     except Exception as e:
                         st.error(f"Error generating {chart_name} chart: {str(e)}")
 
@@ -238,29 +254,44 @@ def create_kpi_performance_chart(df, name):
 
 # Helper function to setup consistent chart styling
 def setup_chart_style():
-    """Set up consistent styling for all charts."""
-    # Set global font size and weight
+    """Set up consistent styling for all charts with executive-level polish."""
+    # Set global font size and weight - make everything bolder and more professional
     plt.rcParams.update({
         'font.size': 14,
         'font.weight': 'bold',
-        'axes.titlesize': 18,
+        'axes.titlesize': 20,
         'axes.titleweight': 'bold',
         'axes.labelsize': 16,
         'axes.labelweight': 'bold',
         'xtick.labelsize': 14,
         'ytick.labelsize': 14,
-        'figure.constrained_layout.use': True  # Use constrained layout for better spacing
+        'figure.constrained_layout.use': True,  # Use constrained layout for better spacing
+        'axes.grid': True,
+        'grid.alpha': 0.3,
+        'axes.spines.top': False,
+        'axes.spines.right': False,
+        'axes.edgecolor': '#333333',
+        'axes.linewidth': 1.5,
+        'figure.facecolor': '#ffffff',
+        'axes.facecolor': '#f9f9f9',
     })
     
     # Create figure with consistent size for all charts
     # Using a fixed aspect ratio to ensure all charts have the same height
-    fig, ax = plt.subplots(figsize=(12, 8), dpi=100)
+    fig, ax = plt.subplots(figsize=(12, 8), dpi=120)  # Increased DPI for sharper images
     
     # Set figure face color to white for better appearance
     fig.set_facecolor('white')
     
     # Adjust the bottom margin to create more space for x-axis labels
     plt.subplots_adjust(bottom=0.15)
+    
+    # Add a subtle background color to enhance readability
+    ax.set_facecolor('#f9f9f9')
+    
+    # Add a border to the figure for a more polished look
+    fig.patch.set_edgecolor('#e0e0e0')
+    fig.patch.set_linewidth(2)
     
     return fig, ax
 
