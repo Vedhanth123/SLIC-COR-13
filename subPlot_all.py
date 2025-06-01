@@ -65,9 +65,7 @@ for idx, cat in enumerate(categories):
         ax.bar_label(container, labels=labels, padding=5)
 
     # Adjust legend
-    ax.legend(title='Cohort Type')
-
-    # Chart 2: KPI Performance by cat (top-middle)
+    ax.legend(title='Cohort Type')    # Chart 2: KPI Performance by cat (top-middle)
     ax = axes[0, 1]
 
     # Get the 4th and 8th columns (indices 3 and 7)
@@ -100,13 +98,38 @@ for idx, cat in enumerate(categories):
 
     ax.set_title(f'KPI Performance by {cat.name} CAP LRM')
     ax.set_xlabel(f'{cat.name}')
-    ax.set_ylabel('Achievement %')    # Adding value labels on top of each bar
+    ax.set_ylabel('Achievement %')    
+    
+    # Adding value labels on top of each bar
     for container_idx, container in enumerate(ax.containers):
         labels = []
-        for bar in container:
+        for bar_idx, bar in enumerate(container):
             height = bar.get_height()
             labels.append(f'{height:.2f}%')
         ax.bar_label(container, labels=labels, padding=5)
+    
+    # Add special tick markers for the Female category if this is the Gender dashboard
+    if cat.name == "Gender":
+        # Find the index of Female category from the melted data
+        female_indices = [i for i, category in enumerate(kpi_melted['Category']) if category == 'Female']
+        
+        # Add special markers/ticks for Female bars
+        for container_idx, container in enumerate(ax.containers):
+            for bar_idx, bar in enumerate(container):
+                if bar_idx in female_indices:
+                    # Add a star marker above the female bar
+                    height = bar.get_height()
+                    ax.scatter(bar_idx, height + 2, marker='*', s=120, color='red', zorder=10)
+                    
+                    # Add a text annotation indicating female performance
+                    if container_idx == 0:  # Only add once per category
+                        female_value = height
+                        ax.text(bar_idx, height + 4, 
+                                "★ Female KPI", 
+                                ha='center', va='bottom', 
+                                color='darkred', fontweight='bold',
+                                bbox=dict(boxstyle='round,pad=0.3', 
+                                          fc='mistyrose', ec='red', alpha=0.7))
 
     # Adjust legend
     ax.legend(title='Performance Metric')
