@@ -4,9 +4,24 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import sys
+import json
+import os
 
 # Set seaborn style
 sns.set_theme(style="whitegrid")
+
+# Initialize session state for storing custom recommendations
+if 'custom_recommendations' not in st.session_state:
+    # Try to load existing recommendations from file
+    recommendations_file = 'custom_recommendations.json'
+    if os.path.exists(recommendations_file):
+        try:
+            with open(recommendations_file, 'r') as f:
+                st.session_state.custom_recommendations = json.load(f)
+        except:
+            st.session_state.custom_recommendations = {}
+    else:
+        st.session_state.custom_recommendations = {}
 
 # Helper function to setup consistent chart styling
 def setup_chart_style():
@@ -57,6 +72,22 @@ def extend_y_limits(ax, top_extension=0.2):
     extra_space = (y_max - y_min) * top_extension
     ax.set_ylim(y_min, y_max + extra_space)
 
+def get_recommendation_key(category, chart_name):
+    """Generate a unique key for storing chart recommendations."""
+    return f"{category}_{chart_name}"
+
+def save_recommendation(key, text):
+    """Save a recommendation to the session state and to a file."""
+    st.session_state.custom_recommendations[key] = text
+    
+    # Save to file
+    recommendations_file = 'custom_recommendations.json'
+    with open(recommendations_file, 'w') as f:
+        json.dump(st.session_state.custom_recommendations, f, indent=2)
+    
+    # Show a success message
+    st.success("Recommendation saved successfully!")
+
 def main():    # Set page configuration
     st.set_page_config(
         page_title="HDFC Analysis Dashboard",
@@ -73,6 +104,16 @@ def main():    # Set page configuration
             <p style='color: #555; font-size: 18px; font-weight: 500;'>Executive Summary Report</p>
         </div>
     """, unsafe_allow_html=True)
+      # Add information about the custom recommendation feature
+    with st.expander("About Custom Recommendations", expanded=False):
+        st.info("""
+        **How to Use Custom Recommendations:**
+        
+        1. Each chart has a recommendation input box where you can write your own analysis and insights.
+        2. Your recommendations will be saved when you click the "Save" button.
+        3. Recommendations are saved per chart and per category (Gender, Education, Experience, Age).
+        4. All recommendations are stored in a file called "custom_recommendations.json" which persists between dashboard sessions.
+        """)
     
     # Load all dataframes
     with st.spinner('Loading data from HDFC_modified.xlsx...'):
@@ -237,31 +278,24 @@ def create_distribution_chart(df, name):
     
     # Use full width in Streamlit
     st.pyplot(fig, use_container_width=True)
-      # Add data-driven observations below the chart
     
-    # Find the category with the highest count for each metric
-    highest_category_col1 = df.iloc[df[df.columns[1]].idxmax()]['Category']
-    highest_category_col2 = df.iloc[df[df.columns[2]].idxmax()]['Category']
-    highest_value_col1 = df[df.columns[1]].max()
-    highest_value_col2 = df[df.columns[2]].max()
+    # Generate a unique key for this chart's recommendation
+    rec_key = get_recommendation_key(name, "Distribution")
     
-    # Calculate percentages
-    total_col1 = df[df.columns[1]].sum()
-    total_col2 = df[df.columns[2]].sum()
-    highest_percent_col1 = (highest_value_col1 / total_col1) * 100
-    highest_percent_col2 = (highest_value_col2 / total_col2) * 100
+    # Get any existing recommendation
+    existing_rec = st.session_state.custom_recommendations.get(rec_key, "")
     
-    st.markdown(f"""
-    <div style="background-color: #f5f7ff; border-left: 4px solid #0A2472; padding: 10px; border-radius: 5px; margin: 10px 0;">
-        <h4 style="color: #0A2472; margin-top: 0;">Distribution Chart Insights:</h4>
-        <ul style="margin-bottom: 0;">
-            <li><b>{highest_category_col1}</b> represents the largest segment with {int(highest_value_col1)} employees ({highest_percent_col1:.1f}% of total cohort).</li>
-            <li>In the second cohort, <b>{highest_category_col2}</b> shows the highest representation with {int(highest_value_col2)} employees ({highest_percent_col2:.1f}%).</li>
-            <li>The distribution shows a {total_col1 > total_col2 and f"{((total_col1/total_col2)-1)*100:.1f}% larger" or f"{((total_col2/total_col1)-1)*100:.1f}% smaller"} first cohort ({total_col1} vs {total_col2} employees).</li>
-            <li>This demographic composition suggests targeted HR strategies should focus on the {highest_category_col1} and {highest_category_col2} segments.</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
+    # Create text area for custom recommendation
+    custom_rec = st.text_area(
+        "Recommendation:",
+        value=existing_rec,
+        height=150,
+        key=f"text_{rec_key}"
+    )
+    
+    # Add a save button
+    if st.button("Save", key=f"save_{rec_key}"):
+        save_recommendation(rec_key, custom_rec)
 
 def create_kpi_performance_chart(df, name):
     """Create the KPI performance chart."""
@@ -387,39 +421,24 @@ def create_kpi_performance_chart(df, name):
     
     # Use full width in Streamlit
     st.pyplot(fig, use_container_width=True)
-      # Add data-driven observations below the chart
     
-    # Get the 4th and 8th columns (indices 3 and 7)
-    col4 = df.columns[3]
-    col8 = df.columns[7]
+    # Generate a unique key for this chart's recommendation
+    rec_key = get_recommendation_key(name, "KPI Performance")
     
-    # Find the category with highest combined KPI
-    top_combined_category = df.iloc[df[col4].idxmax()]['Category']
-    top_combined_value = df[col4].max() * 100  # Convert to percentage
+    # Get any existing recommendation
+    existing_rec = st.session_state.custom_recommendations.get(rec_key, "")
     
-    # Find the category with highest KPI 1
-    top_kpi1_category = df.iloc[df[col8].idxmax()]['Category']
-    top_kpi1_value = df[col8].max() * 100  # Convert to percentage
+    # Create text area for custom recommendation
+    custom_rec = st.text_area(
+        "Recommendation:",
+        value=existing_rec,
+        height=150,
+        key=f"text_{rec_key}"
+    )
     
-    # Calculate the average KPI values
-    avg_combined = df[col4].mean() * 100
-    avg_kpi1 = df[col8].mean() * 100
-    
-    # Calculate the gap between highest and lowest performers
-    gap_combined = (df[col4].max() - df[col4].min()) * 100
-    gap_kpi1 = (df[col8].max() - df[col8].min()) * 100
-    
-    st.markdown(f"""
-    <div style="background-color: #f5f7ff; border-left: 4px solid #0A2472; padding: 10px; border-radius: 5px; margin: 10px 0;">
-        <h4 style="color: #0A2472; margin-top: 0;">KPI Performance Insights:</h4>
-        <ul style="margin-bottom: 0;">
-            <li><b>{top_combined_category}</b> achieves the highest Combined KPI score at <b>{top_combined_value:.0f}%</b>, {(top_combined_value-avg_combined):.1f} percentage points above average.</li>
-            <li><b>{top_kpi1_category}</b> leads in KPI 1 performance with <b>{top_kpi1_value:.0f}%</b>, {(top_kpi1_value-avg_kpi1):.1f} percentage points higher than the average.</li>
-            <li>Performance gap of {gap_combined:.0f} percentage points in Combined KPI indicates {gap_combined > 20 and "significant" or "moderate"} variability across {name} categories.</li>
-            <li>Targeted coaching would benefit underperforming segments where KPI achievement falls below {min(avg_combined, avg_kpi1):.0f}%.</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
+    # Add a save button
+    if st.button("Save", key=f"save_{rec_key}"):
+        save_recommendation(rec_key, custom_rec)
 
 def create_performance_multiple_chart(df, name):
     """Create the performance multiple chart."""
@@ -495,39 +514,24 @@ def create_performance_multiple_chart(df, name):
     
     # Use full width in Streamlit
     st.pyplot(fig, use_container_width=True)
-      # Add data-driven observations below the chart
     
-    # Get the 7th and 11th columns (indices 6 and 10)
-    col7 = df.columns[6]
-    col11 = df.columns[10]
+    # Generate a unique key for this chart's recommendation
+    rec_key = get_recommendation_key(name, "Performance Multiple")
     
-    # Find highest performers
-    top_combined_category = df.iloc[df[col7].idxmax()]['Category']
-    top_combined_value = df[col7].max()
+    # Get any existing recommendation
+    existing_rec = st.session_state.custom_recommendations.get(rec_key, "")
     
-    top_kpi1_category = df.iloc[df[col11].idxmax()]['Category']
-    top_kpi1_value = df[col11].max()
+    # Create text area for custom recommendation
+    custom_rec = st.text_area(
+        "Recommendation:",
+        value=existing_rec,
+        height=150,
+        key=f"text_{rec_key}"
+    )
     
-    # Calculate average performance multiples
-    avg_combined = df[col7].mean()
-    avg_kpi1 = df[col11].mean()
-    
-    # Identify categories performing above average on both metrics
-    consistently_high = [cat for cat in df['Category'] if 
-                        df.loc[df['Category'] == cat, col7].values[0] > avg_combined and
-                        df.loc[df['Category'] == cat, col11].values[0] > avg_kpi1]
-    
-    st.markdown(f"""
-    <div style="background-color: #f5f7ff; border-left: 4px solid #0A2472; padding: 10px; border-radius: 5px; margin: 10px 0;">
-        <h4 style="color: #0A2472; margin-top: 0;">Performance Multiple Insights:</h4>
-        <ul style="margin-bottom: 0;">
-            <li><b>{top_combined_category}</b> achieves the highest Combined KPI multiple at <b>{top_combined_value:.1f}x</b>, outperforming targets by {(top_combined_value-1)*100:.0f}%.</li>
-            <li><b>{top_kpi1_category}</b> leads in KPI 1 with a multiple of <b>{top_kpi1_value:.1f}x</b>, exceeding targets by {(top_kpi1_value-1)*100:.0f}%.</li>
-            <li>The average performance multiple across all {name} categories is {avg_combined:.1f}x for Combined KPI and {avg_kpi1:.1f}x for KPI 1.</li>
-            <li>{', '.join(consistently_high) if consistently_high else 'No categories'} {len(consistently_high) == 1 and 'demonstrates' or 'demonstrate'} consistently high performance across both KPI types, suggesting effective best practices.</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
+    # Add a save button
+    if st.button("Save", key=f"save_{rec_key}"):
+        save_recommendation(rec_key, custom_rec)
 
 def create_top_bottom_performers_chart(df, name):
     """Create the top and bottom performers chart."""
@@ -627,46 +631,24 @@ def create_top_bottom_performers_chart(df, name):
     
     # Use full width in Streamlit
     st.pyplot(fig, use_container_width=True)
-      # Add data-driven observations below the chart
     
-    # Get the columns for top and bottom performers
-    col5 = df.columns[4]  # Top performers Combined KPI
-    col6 = df.columns[5]  # Bottom performers Combined KPI
-    col9 = df.columns[8]  # Top performers KPI 1
-    col10 = df.columns[9]  # Bottom performers KPI 1
+    # Generate a unique key for this chart's recommendation
+    rec_key = get_recommendation_key(name, "Top vs Bottom Performers")
     
-    # Calculate performance gaps for each category
-    df['Performance_Gap_Combined'] = df[col5] - df[col6]
-    df['Performance_Gap_KPI1'] = df[col9] - df[col10]
+    # Get any existing recommendation
+    existing_rec = st.session_state.custom_recommendations.get(rec_key, "")
     
-    # Find the category with the largest performance gap
-    largest_gap_category = df.iloc[df['Performance_Gap_Combined'].idxmax()]['Category']
-    largest_gap_value = df['Performance_Gap_Combined'].max()
+    # Create text area for custom recommendation
+    custom_rec = st.text_area(
+        "Recommendation:",
+        value=existing_rec,
+        height=150,
+        key=f"text_{rec_key}"
+    )
     
-    # Find the category with the highest top performers
-    best_top_category = df.iloc[df[col5].idxmax()]['Category']
-    best_top_value = df[col5].max()
-    
-    # Find the category with the lowest bottom performers
-    worst_bottom_category = df.iloc[df[col6].idxmin()]['Category']
-    worst_bottom_value = df[col6].min()
-    
-    # Calculate average values
-    avg_top_combined = df[col5].mean()
-    avg_bottom_combined = df[col6].mean()
-    avg_gap = avg_top_combined - avg_bottom_combined
-    
-    st.markdown(f"""
-    <div style="background-color: #f5f7ff; border-left: 4px solid #0A2472; padding: 10px; border-radius: 5px; margin: 10px 0;">
-        <h4 style="color: #0A2472; margin-top: 0;">Top vs Bottom Performers Insights:</h4>
-        <ul style="margin-bottom: 0;">
-            <li>The <b>{largest_gap_category}</b> category shows the widest performance gap of <b>{largest_gap_value:.1f}</b> CAP points between top and bottom performers.</li>
-            <li><b>{best_top_category}</b> has the highest-performing top 10% with a CAP value of <b>{best_top_value:.1f}</b>, {(best_top_value - avg_top_combined):.1f} points above the average top performer.</li>
-            <li>Bottom performers in <b>{worst_bottom_category}</b> show the lowest CAP value at <b>{worst_bottom_value:.1f}</b>, requiring targeted performance improvement.</li>
-            <li>The average performance gap of {avg_gap:.1f} CAP points between top and bottom 10% indicates {avg_gap > largest_gap_value * 0.8 and "consistent" or "inconsistent"} performance variability across {name} categories.</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
+    # Add a save button
+    if st.button("Save", key=f"save_{rec_key}"):
+        save_recommendation(rec_key, custom_rec)
 
 def create_time_to_first_sale_chart(df, name):
     """Create the time to first sale chart."""
@@ -729,39 +711,24 @@ def create_time_to_first_sale_chart(df, name):
     
     # Use full width in Streamlit
     st.pyplot(fig, use_container_width=True)
-      # Add data-driven observations below the chart
     
-    # Get the time to first sale column
-    col12 = df.columns[11]
+    # Generate a unique key for this chart's recommendation
+    rec_key = get_recommendation_key(name, "Time to First Sale")
     
-    # Find fastest and slowest categories
-    fastest_category = df.iloc[df[col12].idxmin()]['Category']
-    fastest_time = df[col12].min()
+    # Get any existing recommendation
+    existing_rec = st.session_state.custom_recommendations.get(rec_key, "")
     
-    slowest_category = df.iloc[df[col12].idxmax()]['Category']
-    slowest_time = df[col12].max()
+    # Create text area for custom recommendation
+    custom_rec = st.text_area(
+        "Recommendation:",
+        value=existing_rec,
+        height=150,
+        key=f"text_{rec_key}"
+    )
     
-    # Calculate the overall average
-    avg_time = df[col12].mean()
-    
-    # Calculate percentage differences
-    pct_faster = ((avg_time - fastest_time) / avg_time) * 100
-    pct_slower = ((slowest_time - avg_time) / avg_time) * 100
-    
-    # Calculate timespan range
-    time_range = slowest_time - fastest_time
-    
-    st.markdown(f"""
-    <div style="background-color: #f5f7ff; border-left: 4px solid #0A2472; padding: 10px; border-radius: 5px; margin: 10px 0;">
-        <h4 style="color: #0A2472; margin-top: 0;">Time to First Sale Insights:</h4>
-        <ul style="margin-bottom: 0;">
-            <li><b>{fastest_category}</b> employees achieve their first sale fastest at <b>{fastest_time:.2f} months</b>, {pct_faster:.1f}% faster than the organizational average.</li>
-            <li><b>{slowest_category}</b> takes the longest at <b>{slowest_time:.2f} months</b>, {pct_slower:.1f}% above the average of {avg_time:.2f} months.</li>
-            <li>The {time_range:.2f} month gap between fastest and slowest categories represents a {(time_range/fastest_time)*100:.0f}% difference in onboarding efficiency.</li>
-            <li>Applying the {fastest_category} onboarding practices to the {slowest_category} segment could potentially reduce time to productivity by up to {slowest_time - fastest_time:.2f} months.</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
+    # Add a save button
+    if st.button("Save", key=f"save_{rec_key}"):
+        save_recommendation(rec_key, custom_rec)
 
 def create_car2catpo_ratio_chart(df, name):
     """Create the CAR2CATPO ratio chart."""
@@ -820,43 +787,27 @@ def create_car2catpo_ratio_chart(df, name):
         
     # Add more padding around figure
     plt.tight_layout(pad=3.0)
-      # Use full width in Streamlit
+    
+    # Use full width in Streamlit
     st.pyplot(fig, use_container_width=True)
-      # Add data-driven observations below the chart
     
-    # Get the CAR2CATPO ratio column
-    col13 = df.columns[12]
+    # Generate a unique key for this chart's recommendation
+    rec_key = get_recommendation_key(name, "CAR2CATPO Ratio")
     
-    # Find highest and lowest ratio categories
-    highest_category = df.iloc[df[col13].idxmax()]['Category']
-    highest_ratio = df[col13].max()
+    # Get any existing recommendation
+    existing_rec = st.session_state.custom_recommendations.get(rec_key, "")
     
-    lowest_category = df.iloc[df[col13].idxmin()]['Category']
-    lowest_ratio = df[col13].min()
+    # Create text area for custom recommendation
+    custom_rec = st.text_area(
+        "Recommendation:",
+        value=existing_rec,
+        height=150,
+        key=f"text_{rec_key}"
+    )
     
-    # Calculate the average
-    avg_ratio = df[col13].mean()
-    
-    # Calculate percentage differences from average
-    pct_above_avg = ((highest_ratio - avg_ratio) / avg_ratio) * 100
-    pct_below_avg = ((avg_ratio - lowest_ratio) / avg_ratio) * 100
-    
-    # Count categories above average
-    above_avg_count = sum(df[col13] > avg_ratio)
-    total_categories = len(df)
-    above_avg_percent = (above_avg_count / total_categories) * 100
-    
-    st.markdown(f"""
-    <div style="background-color: #f5f7ff; border-left: 4px solid #0A2472; padding: 10px; border-radius: 5px; margin: 10px 0;">
-        <h4 style="color: #0A2472; margin-top: 0;">CAR2CATPO Ratio Insights:</h4>
-        <ul style="margin-bottom: 0;">
-            <li><b>{highest_category}</b> demonstrates the highest conversion efficiency with a ratio of <b>{highest_ratio:.2f}</b>, {pct_above_avg:.1f}% above the average.</li>
-            <li><b>{lowest_category}</b> shows the lowest efficiency at <b>{lowest_ratio:.2f}</b>, {pct_below_avg:.1f}% below the organizational average of {avg_ratio:.2f}.</li>
-            <li>{above_avg_count} out of {total_categories} {name} categories ({above_avg_percent:.0f}%) exceed the average conversion efficiency.</li>
-            <li>Best practices from {highest_category} could potentially improve {lowest_category}'s conversion efficiency by {((highest_ratio/lowest_ratio)-1)*100:.0f}% if successfully transferred.</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
+    # Add a save button
+    if st.button("Save", key=f"save_{rec_key}"):
+        save_recommendation(rec_key, custom_rec)
 
 def create_attrition_count_chart(df, name):
     """Create the attrition count chart."""
@@ -920,47 +871,33 @@ def create_attrition_count_chart(df, name):
         
     # Add more padding around figure
     plt.tight_layout(pad=3.0)
-      # Use full width in Streamlit
+    
+    # Use full width in Streamlit
     st.pyplot(fig, use_container_width=True)
-      # Add data-driven observations below the chart
     
-    # Get the attrition column
-    col14 = df.columns[13]
+    # Generate a unique key for this chart's recommendation
+    rec_key = get_recommendation_key(name, "Attrition Count")
     
-    # Find categories with highest and lowest attrition
-    highest_category = df.iloc[df[col14].idxmax()]['Category']
-    highest_count = df[col14].max()
-    highest_rate = attrition_rates[df[col14].idxmax()]
+    # Get any existing recommendation
+    existing_rec = st.session_state.custom_recommendations.get(rec_key, "")
     
-    lowest_category = df.iloc[df[col14].idxmin()]['Category']
-    lowest_count = df[col14].min()
-    lowest_rate = attrition_rates[df[col14].idxmin()]
+    # Create text area for custom recommendation
+    custom_rec = st.text_area(
+        "Recommendation:",
+        value=existing_rec,
+        height=150,
+        key=f"text_{rec_key}"
+    )
     
-    # Calculate total and average attrition
-    total_attrition = df[col14].sum()
-    avg_rate = (total_attrition / df['CAP LRM cohort'].sum()) * 100
-    
-    # Calculate highest attrition cost if available (estimated)
-    estimated_cost_per_employee = 1.5  # placeholder multiplier for annual salary
-    estimated_cost = highest_count * estimated_cost_per_employee
-    
-    st.markdown(f"""
-    <div style="background-color: #f5f7ff; border-left: 4px solid #0A2472; padding: 10px; border-radius: 5px; margin: 10px 0;">
-        <h4 style="color: #0A2472; margin-top: 0;">Attrition Count Insights:</h4>
-        <ul style="margin-bottom: 0;">
-            <li><b>{highest_category}</b> shows the highest attrition with <b>{int(highest_count)} employees</b> ({highest_rate:.1f}%), {(highest_rate/lowest_rate):.1f}x higher than the lowest category.</li>
-            <li><b>{lowest_category}</b> demonstrates the best retention with only <b>{int(lowest_count)} employees</b> leaving ({lowest_rate:.1f}% attrition rate).</li>
-            <li>The organization-wide attrition rate is {avg_rate:.1f}%, with a total of {int(total_attrition)} employees having left across all {name} categories.</li>
-            <li>Targeted retention programs for the {highest_category} segment could potentially save significant replacement costs and preserve institutional knowledge.</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
+    # Add a save button
+    if st.button("Save", key=f"save_{rec_key}"):
+        save_recommendation(rec_key, custom_rec)
 
 def create_average_residency_chart(df, name):
     """Create the average residency chart."""
     fig, ax = setup_chart_style()
     
-    # Get the 15th and 16th columns (indices 14 and 15)
+    # Get the 15th column (index 14)
     col15 = df.columns[14]  # Average Residency of all employees
     col16 = df.columns[15]  # Average Residency of TOP 100 employees
 
@@ -1033,54 +970,39 @@ def create_average_residency_chart(df, name):
         
     # Add more padding around figure
     plt.tight_layout(pad=3.0)
-      # Use full width in Streamlit
+    
+    # Use full width in Streamlit
     st.pyplot(fig, use_container_width=True)
-      # Add data-driven observations below the chart
     
-    # Get the average residency columns
-    col15 = df.columns[14]  # Average Residency of all employees
-    col16 = df.columns[15]  # Average Residency of TOP 100 employees
+    # Generate a unique key for this chart's recommendation
+    rec_key = get_recommendation_key(name, "Average Residency")
     
-    # Find categories with highest tenure for all employees and top performers
-    highest_all_cat = df.iloc[df[col15].idxmax()]['Category']
-    highest_all_value = df[col15].max()
+    # Get any existing recommendation
+    existing_rec = st.session_state.custom_recommendations.get(rec_key, "")
     
-    highest_top_cat = df.iloc[df[col16].idxmax()]['Category']
-    highest_top_value = df[col16].max()
+    # Create text area for custom recommendation
+    custom_rec = st.text_area(
+        "Recommendation:",
+        value=existing_rec,
+        height=150,
+        key=f"text_{rec_key}"
+    )
     
-    # Calculate averages
-    avg_all = df[col15].mean()
-    avg_top = df[col16].mean()
-    
-    # Find category with largest difference between top performers and all employees
-    df['tenure_diff'] = df[col16] - df[col15]
-    largest_diff_cat = df.iloc[df['tenure_diff'].idxmax()]['Category']
-    largest_diff_value = df['tenure_diff'].max()
-    largest_diff_percent = (largest_diff_value / df.loc[df['Category'] == largest_diff_cat, col15].values[0]) * 100
-    
-    st.markdown(f"""
-    <div style="background-color: #f5f7ff; border-left: 4px solid #0A2472; padding: 10px; border-radius: 5px; margin: 10px 0;">
-        <h4 style="color: #0A2472; margin-top: 0;">Average Residency Insights:</h4>
-        <ul style="margin-bottom: 0;">
-            <li><b>{highest_all_cat}</b> employees have the longest average tenure at <b>{highest_all_value:.2f} months</b>, {highest_all_value-avg_all:.2f} months above the overall average.</li>
-            <li>Top performers in <b>{highest_top_cat}</b> show the highest loyalty with <b>{highest_top_value:.2f} months</b> average tenure.</li>
-            <li><b>{largest_diff_cat}</b> shows the largest gap between top performers and all employees at <b>{largest_diff_value:.2f} months</b> ({largest_diff_percent:.1f}% longer).</li>
-            <li>On average, top performers stay {avg_top-avg_all:.2f} months ({((avg_top/avg_all)-1)*100:.1f}%) longer than the general employee population, confirming the value of experience in achieving results.</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
+    # Add a save button
+    if st.button("Save", key=f"save_{rec_key}"):
+        save_recommendation(rec_key, custom_rec)
 
 def create_infant_attrition_chart(df, name):
     """Create the infant attrition chart."""
     fig, ax = setup_chart_style()
     
-    # Get the last column (index 17)
-    last_col = df.columns[-1]  # Using -1 to access the last column
+    # Get the 16th column (index 15)
+    col16 = df.columns[15]
 
     # Create a DataFrame for the chart with a shorter column name for display
     infant_attrition_data = pd.DataFrame({
         'Category': df['Category'],
-        'Infant Attrition': df[last_col] * 100  # Convert to percentage
+        'Infant Attrition': df[col16] * 100  # Convert to percentage
     })
 
     # Using seaborn barplot (fixed deprecation warning)
@@ -1127,41 +1049,27 @@ def create_infant_attrition_chart(df, name):
         
     # Add more padding around figure
     plt.tight_layout(pad=3.0)
-      # Use full width in Streamlit
+    
+    # Use full width in Streamlit
     st.pyplot(fig, use_container_width=True)
-      # Add data-driven observations below the chart
     
-    # Get the infant attrition column
-    last_col = df.columns[-1]
+    # Generate a unique key for this chart's recommendation
+    rec_key = get_recommendation_key(name, "Infant Attrition")
     
-    # Find highest and lowest attrition categories
-    highest_category = df.iloc[df[last_col].idxmax()]['Category']
-    highest_rate = df[last_col].max() * 100  # Convert to percentage
+    # Get any existing recommendation
+    existing_rec = st.session_state.custom_recommendations.get(rec_key, "")
     
-    lowest_category = df.iloc[df[last_col].idxmin()]['Category']
-    lowest_rate = df[last_col].min() * 100  # Convert to percentage
+    # Create text area for custom recommendation
+    custom_rec = st.text_area(
+        "Recommendation:",
+        value=existing_rec,
+        height=150,
+        key=f"text_{rec_key}"
+    )
     
-    # Calculate average attrition
-    avg_attrition = df[last_col].mean() * 100
-    
-    # Calculate how much higher the worst category is than average
-    pct_above_avg = ((highest_rate - avg_attrition) / avg_attrition) * 100
-    
-    # Count categories above average
-    above_avg_count = sum(df[last_col] > df[last_col].mean())
-    total_categories = len(df)
-    
-    st.markdown(f"""
-    <div style="background-color: #f5f7ff; border-left: 4px solid #0A2472; padding: 10px; border-radius: 5px; margin: 10px 0;">
-        <h4 style="color: #0A2472; margin-top: 0;">Infant Attrition Insights:</h4>
-        <ul style="margin-bottom: 0;">
-            <li><b>{highest_category}</b> faces the most significant onboarding challenge with an infant attrition rate of <b>{highest_rate:.1f}%</b>, {pct_above_avg:.1f}% above the company average.</li>
-            <li><b>{lowest_category}</b> demonstrates best-in-class early retention at just <b>{lowest_rate:.1f}%</b>, {((highest_rate/lowest_rate)-1)*100:.1f}% lower than the worst-performing category.</li>
-            <li>The organization's average infant attrition rate is <b>{avg_attrition:.1f}%</b>, with {above_avg_count} out of {total_categories} {name} categories exceeding this average.</li>
-            <li>Applying {lowest_category}'s onboarding practices to {highest_category} could potentially reduce early departures by up to {highest_rate-lowest_rate:.1f} percentage points.</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
+    # Add a save button
+    if st.button("Save", key=f"save_{rec_key}"):
+        save_recommendation(rec_key, custom_rec)
 
 if __name__ == "__main__":
     main()

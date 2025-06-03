@@ -2,7 +2,7 @@
 echo HDFC Analysis Dashboard Launcher
 echo ------------------------------
 echo 1. Run Full Dashboard (All tabs)
-echo 2. Run Simple Dashboard (One category at a time)
+echo 2. Run Simple Dashboard with Custom Recommendations (One category at a time)
 echo ------------------------------
 choice /C 12 /M "Select an option:"
 
@@ -17,7 +17,7 @@ streamlit run streamlit_dashboard.py
 goto END
 
 :SIMPLE
-echo Starting HDFC Simple Analysis Dashboard...
+echo Starting HDFC Simple Analysis Dashboard with Custom Recommendations...
 cd /d "e:\Ver6-COR-13-HDFC"
 call .\env\Scripts\activate.bat
 streamlit run streamlit_dashboard_simple.py
