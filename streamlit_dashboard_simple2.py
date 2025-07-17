@@ -124,6 +124,8 @@ def main():    # Set page configuration
             Education = pd.read_excel('SLIC_modified.xlsx', sheet_name='Education')
             Experience = pd.read_excel('SLIC_modified.xlsx', sheet_name='Experience')
             Age = pd.read_excel('SLIC_modified.xlsx', sheet_name='Age')
+            Designation = pd.read_excel('SLIC_modified.xlsx', sheet_name='Designation')
+
             st.success("Data loaded successfully!")
             
             # Create list of dataframes with their display names
@@ -131,13 +133,15 @@ def main():    # Set page configuration
                 {"df": Gender, "name": "Gender"},
                 {"df": Education, "name": "Education"},
                 {"df": Experience, "name": "Experience"},
-                {"df": Age, "name": "Age"}
+                {"df": Age, "name": "Age"},
+                {"df": Designation, "name": "Designation"}
+
             ]
               # Create a dropdown to select the category with clear styling
             st.markdown("<h2 style='text-align: center; color: #444; margin: 20px 0;'>Select a category to analyze:</h2>", unsafe_allow_html=True)
             category = st.selectbox(
                 "",
-                ['Gender', 'Education', 'Experience', 'Age'],
+                ['Gender', 'Education', 'Experience', 'Age', 'Designation'],
                 index=1 if 'Education' in sys.argv else 0,
                 format_func=lambda x: f"{x}"
             )
@@ -165,8 +169,8 @@ def create_dashboard(df, name):
         '📊 Select visualizations to display:',
         ['Distribution', 'KPI Performance', 'Performance Multiple', 
          'Top vs Bottom Performers', 'Time to First Sale', 'CAR2CATPO Ratio',
-         'Attrition Count', 'Average Residency', 'Infant Attrition'],
-        default=['Distribution', 'KPI Performance', 'Performance Multiple']
+         'Attrition Count', 'Average Residency', 'Infant Attrition', 'Retention', 'Cost of Hire'],
+        default=['Distribution', 'KPI Performance', 'Performance Multiple', 'Retention']
     )
     st.markdown("</div>", unsafe_allow_html=True)
     
@@ -180,7 +184,9 @@ def create_dashboard(df, name):
         'CAR2CATPO Ratio': create_car2catpo_ratio_chart,
         'Attrition Count': create_attrition_count_chart,
         'Average Residency': create_average_residency_chart,
-        'Infant Attrition': create_infant_attrition_chart
+        'Infant Attrition': create_infant_attrition_chart,
+        'Retention': create_retention_chart,
+        'Cost of Hire': create_cost_of_hire_chart
     }
       # Organize charts into rows with equal heights
     # Determine how many rows we need (3 charts per row)
@@ -211,6 +217,7 @@ def create_dashboard(df, name):
                     except Exception as e:
                         st.error(f"Error generating {chart_name} chart: {str(e)}")
 
+
 def create_distribution_chart(df, name):
     """Create the distribution chart."""
     fig, ax = setup_chart_style()
@@ -227,37 +234,62 @@ def create_distribution_chart(df, name):
     # Calculate percentages for each cohort
     for metric in [first_cols[1], first_cols[2]]:
         total = df[metric].sum()
-        df_melted.loc[df_melted['Metric'] == metric, 'Percentage'] = df_melted.loc[df_melted['Metric'] == metric, 'Count'] / total * 100    
+        # Avoid division by zero if a cohort has no members
+        if total > 0:
+            df_melted.loc[df_melted['Metric'] == metric, 'Percentage'] = df_melted.loc[df_melted['Metric'] == metric, 'Count'] / total * 100
+        else:
+            df_melted.loc[df_melted['Metric'] == metric, 'Percentage'] = 0
     
     # Using seaborn barplot with grouped bars and better colors
     bars = sns.barplot(x='Category', y='Count', hue='Metric', 
-                      data=df_melted, 
-                      palette=['#1f77b4', '#9ecae1'], 
-                      ax=ax, width=0.7)
+                       data=df_melted, 
+                       palette=['#1f77b4', '#9ecae1'], 
+                       ax=ax, width=0.7)
 
     ax.set_title(f'{name} Distribution by Cohort', pad=20)
     ax.set_xlabel(f'{name}', labelpad=15)
-    ax.set_ylabel('Head Count', labelpad=15)    # Adding value labels and percentages inside the bars with increased font size (20% larger)
-    base_fontsize = 16  # Increased from 13 (20% larger)
+    ax.set_ylabel('Head Count', labelpad=15)
+
+    # --- Start of Modified Section ---
+    # Adding value labels dynamically inside or outside the bars
+    base_fontsize = 16
+    # Set a dynamic threshold: 10% of the max y-axis value
+    threshold = ax.get_ylim()[1] * 0.10 
+
     for container_idx, container in enumerate(ax.containers):
         for bar_idx, bar in enumerate(container):
             count = bar.get_height()
-            percentage = df_melted.iloc[container_idx*2+bar_idx if container_idx < 2 else bar_idx]['Percentage']
             
-            # Calculate position for text inside the bar
-            x_pos = bar.get_x() + bar.get_width()/2
-            y_pos = count/2  # Mid-point of bar
-            
-            # Add the label inside the bar with white text for better visibility
-            label_text = f'{int(count)}\n({percentage:.1f}%)'
-            color = 'white' if count > 30 else 'black'  # White text for tall bars, black for short ones
-            
-            ax.text(x_pos, y_pos, label_text, 
-                   ha='center', va='center', 
-                   color=color, 
-                   fontsize=base_fontsize,
-                   fontweight='bold',
-                   linespacing=1.3)
+            # Skip labeling for bars with zero height
+            if count == 0:
+                continue
+
+            x_pos = bar.get_x() + bar.get_width() / 2
+            label_text = f'{int(count)}'
+
+            # If the bar is too short, place the text ON TOP
+            if count < threshold:
+                # Add a small offset based on the chart's scale for padding
+                offset = ax.get_ylim()[1] * 0.02 
+                y_pos = count + offset # Position text above the bar
+                color = 'black'
+                
+                ax.text(x_pos, y_pos, label_text,
+                        ha='center', va='bottom', 
+                        color=color,
+                        fontsize=base_fontsize,
+                        fontweight='bold')
+                
+            # Otherwise, place the text INSIDE the bar
+            else:
+                y_pos = count / 2  # Position text in the middle
+                color = 'white'
+                ax.text(x_pos, y_pos, label_text,
+                        ha='center', va='center',
+                        color=color,
+                        fontsize=base_fontsize,
+                        fontweight='bold')
+    # --- End of Modified Section ---
 
     # Enhance grid for better readability
     ax.grid(axis='y', linestyle='--', alpha=0.7)
@@ -265,8 +297,6 @@ def create_distribution_chart(df, name):
     # Adjust legend with better styling
     legend = ax.legend(title='Cohort Type', fontsize=14)
     plt.setp(legend.get_title(), fontsize=16, fontweight='bold')
-    # Extend y-axis to provide more space for labels
-    extend_y_limits(ax, 0.2)
     # Extend y-axis to provide more space for labels
     extend_y_limits(ax, 0.2)
     
@@ -298,118 +328,285 @@ def create_distribution_chart(df, name):
     if st.button("Save", key=f"save_{rec_key}"):
         save_recommendation(rec_key, custom_rec)
 
+def create_retention_chart(df, name):
+    """Create the Retention chart."""
+    fig, ax = setup_chart_style()
+    
+    # Get retention columns
+    col23 = df.columns[22]  # Retention at CAP 3
+    col24 = df.columns[23]  # Retention at CAP 6
+    col25 = df.columns[24]  # Retention at CAP 9
+    col26 = df.columns[25]  # Retention at CAP 12
+
+    # Create shorter column names for display
+    col23_short = "Retention at CAP 3"
+    col24_short = "Retention at CAP 6"
+    col25_short = "Retention at CAP 9"
+    col26_short = "Retention at CAP 12"
+
+    # Create a DataFrame with the data, converting to percentages
+    retention_data = pd.DataFrame({
+        'Category': df['Category'],
+        col23_short: df[col23] * 100,
+        col24_short: df[col24] * 100,
+        col25_short: df[col25] * 100,
+        col26_short: df[col26] * 100
+    })
+
+    # Reshape data for seaborn
+    retention_melted = pd.melt(retention_data, 
+                          id_vars=['Category'], 
+                          value_vars=[col23_short, col24_short, col25_short, col26_short],
+                          var_name='Retention Period', 
+                          value_name='Retention Rate (%)')
+    
+    # Using seaborn barplot with grouped bars
+    sns.barplot(x='Category', y='Retention Rate (%)', hue='Retention Period', 
+                data=retention_melted, 
+                palette='viridis', 
+                ax=ax, width=0.8)
+
+    ax.set_title(f'Employee Retention Rate by {name}', pad=20)
+    ax.set_xlabel(f'{name}', labelpad=15)
+    ax.set_ylabel('Retention Rate (%)', labelpad=15)
+
+    # Adding value labels dynamically inside or outside the bars
+    base_fontsize = 12
+    threshold = ax.get_ylim()[1] * 0.10
+
+    for container in ax.containers:
+        for bar in container:
+            height = bar.get_height()
+            if height == 0:
+                continue
+            
+            label_text = f'{height:.0f}%'
+            x_pos = bar.get_x() + bar.get_width() / 2
+
+            if height < threshold:
+                y_pos = height
+                color = 'black'
+                ax.text(x_pos, y_pos, label_text,
+                        ha='center', va='bottom',
+                        color=color,
+                        fontsize=base_fontsize,
+                        fontweight='bold')
+
+            else:
+                y_pos = height / 2
+                color = 'white'
+                ax.text(x_pos, y_pos, label_text,
+                        ha='center', va='center',
+                        color=color,
+                        fontsize=base_fontsize,
+                        fontweight='bold')
+
+    # Enhance grid for better readability
+    ax.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    # Adjust legend with better styling
+    legend = ax.legend(title='Retention Period', fontsize=12)
+    plt.setp(legend.get_title(), fontsize=14, fontweight='bold')
+
+    # Extend y-axis to provide more space for labels
+    extend_y_limits(ax, 0.2)
+    
+    # Rotate x-axis labels for Education dashboard
+    if name == "Education":
+        plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+        
+    # Add more padding around figure
+    plt.tight_layout(pad=3.0)
+    
+    # Use full width in Streamlit
+    st.pyplot(fig, use_container_width=True)
+    
+    # Generate a unique key for this chart's recommendation
+    rec_key = get_recommendation_key(name, "Retention")
+    
+    # Get any existing recommendation
+    existing_rec = st.session_state.custom_recommendations.get(rec_key, "")
+    
+    # Create text area for custom recommendation
+    custom_rec = st.text_area(
+        "Recommendation:",
+        value=existing_rec,
+        height=150,
+        key=f"text_{rec_key}"
+    )
+    
+    # Add a save button
+    if st.button("Save", key=f"save_{rec_key}"):
+        save_recommendation(rec_key, custom_rec)
+
+
+def create_cost_of_hire_chart(df, name):
+    """Create the Cost of Hire chart."""
+    fig, ax = setup_chart_style()
+    
+    # Get the 21st and 22nd columns (indices 20, 21)
+    col21 = df.columns[20]  # Cost of Wrong Hire
+    col22 = df.columns[21]  # Cost of Back Fill
+
+    # Create shorter column names for display
+    col21_short = "Cost of Wrong Hire"
+    col22_short = "Cost of Back Fill"
+
+    # Create a DataFrame for the chart
+    cost_data = pd.DataFrame({
+        'Category': df['Category'],
+        col21_short: df[col21],
+        col22_short: df[col22]
+    })
+
+    # Reshape data for seaborn
+    cost_melted = pd.melt(cost_data, 
+                             id_vars=['Category'], 
+                             value_vars=[col21_short, col22_short],
+                             var_name='Cost Type', 
+                             value_name='Cost of Hire')
+
+    # Using seaborn barplot with grouped bars
+    bars = sns.barplot(x='Category', y='Cost of Hire', hue='Cost Type', 
+                      data=cost_melted, 
+                      palette=['#d62728', '#ff9896'], 
+                      ax=ax, width=0.7)
+
+    ax.set_title(f'Cost of Hire by {name}', pad=20)
+    ax.set_xlabel(f'{name}', labelpad=15)
+    ax.set_ylabel('Cost of Hire (in thousands)', labelpad=15)
+
+    # Adding value labels dynamically inside or outside the bars
+    base_fontsize = 16
+    threshold = ax.get_ylim()[1] * 0.10
+
+    for bar in bars.patches:
+        height = bar.get_height()
+        if height == 0:
+            continue
+            
+        label_text = f'{height:,.1f}'
+        x_pos = bar.get_x() + bar.get_width() / 2
+
+        if height < threshold:
+            y_pos = height
+            color = 'black'
+            ax.text(x_pos, y_pos, label_text,
+                    ha='center', va='bottom',
+                    color=color,
+                    fontsize=base_fontsize,
+                    fontweight='bold',
+                    xytext=(0, 5),
+                    textcoords='offset points')
+        else:
+            y_pos = height / 2
+            color = 'white'
+            ax.text(x_pos, y_pos, label_text,
+                    ha='center', va='center',
+                    color=color,
+                    fontsize=base_fontsize,
+                    fontweight='bold')
+
+    # Enhance grid for better readability
+    ax.grid(axis='y', linestyle='--', alpha=0.7)
+
+    # Adjust legend
+    ax.legend(title='Cost Type', loc='upper right')
+    
+    # Extend y-axis to provide more space for labels
+    extend_y_limits(ax, 0.2)
+    
+    # Rotate x-axis labels for Education dashboard
+    if name == "Education":
+        plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+        
+    # Add more padding around figure
+    plt.tight_layout(pad=3.0)
+    
+    # Use full width in Streamlit
+    st.pyplot(fig, use_container_width=True)
+    
+    # Generate a unique key for this chart's recommendation
+    rec_key = get_recommendation_key(name, "Cost of Hire")
+    
+    # Get any existing recommendation
+    existing_rec = st.session_state.custom_recommendations.get(rec_key, "")
+    
+    # Create text area for custom recommendation
+    custom_rec = st.text_area(
+        "Recommendation:",
+        value=existing_rec,
+        height=150,
+        key=f"text_{rec_key}"
+    )
+    
+    # Add a save button
+    if st.button("Save", key=f"save_{rec_key}"):
+        save_recommendation(rec_key, custom_rec)
+
 def create_kpi_performance_chart(df, name):
     """Create the KPI performance chart."""
     fig, ax = setup_chart_style()
     
-    # Get the 4th and 8th columns (indices 3 and 7)
-    col4 = df.columns[3]
+    # Get the 8th column (index 7)
     col8 = df.columns[7]
 
     # Create shorter column names for display
-    col4_short = "Cumulative Combined KPI"
-    col8_short = "Cumulative KPI 1"# Create a DataFrame with the data and specified columns, multiplying KPI values by 100 to show as percentages
+    col8_short = "Cumulative KPI 1"
+    
+    # Create a DataFrame with the data and specified columns, multiplying KPI values by 100 to show as percentages
     kpi_data = pd.DataFrame({
         'Category': df['Category'],
-        col4_short: df[col4] * 100,  # Multiply by 100 to convert to percentage
         col8_short: df[col8] * 100   # Multiply by 100 to convert to percentage
     })
 
-    # Reshape data for seaborn
-    kpi_melted = pd.melt(kpi_data, 
-                         id_vars=['Category'], 
-                         value_vars=[col4_short, col8_short],
-                         var_name='KPI Type', 
-                         value_name='Achievement %')
-    
-    # Prepare custom colors - highlight Female in Gender dashboard
-    if name == "Gender":
-        # Create a list to store the colors for each bar
-        bar_colors = []
-        for category in kpi_melted['Category'].unique():
-            # Brighter colors for Female, regular colors for Male
-            if category == 'Female':
-                bar_colors.extend(['#ff5500', '#ff7733'])  # Brighter orange shades for Female
-            else:
-                bar_colors.extend(['#ff7f0e', '#ff9e4a'])  # Regular orange shades
-                
-        # Using seaborn barplot with custom colors
-        bars = sns.barplot(x='Category', y='Achievement %', hue='KPI Type',
-                          data=kpi_melted,
-                          palette=bar_colors if len(bar_colors) > 0 else ['#ff7f0e', '#ff9e4a'],
-                          ax=ax, width=0.7)
-    else:
-        # Regular coloring for non-Gender dashboards
-        bars = sns.barplot(x='Category', y='Achievement %', hue='KPI Type', 
-                          data=kpi_melted, 
-                          palette=['#ff7f0e', '#ff9e4a'], 
-                          ax=ax, width=0.7)
+    # Using seaborn barplot with a single metric
+    bars = sns.barplot(x='Category', y=col8_short, 
+                      data=kpi_data, 
+                      palette=['#ff7f0e'], 
+                      ax=ax, width=0.7)
 
-    ax.set_title(f'KPI Performance by {name} CAP LRM', pad=20)
+    ax.set_title(f'KPI 1 Performance by {name} CAP LRM', pad=20)
     ax.set_xlabel(f'{name}', labelpad=15)
     ax.set_ylabel('Achievement %', labelpad=15)
     
     # Increased font size by 20% (from 13 to 16)
     base_fontsize = 16  # Increased from 13
     
-    # Adding value labels INSIDE the bars
-    for container_idx, container in enumerate(ax.containers):
-        labels = []
-        for bar_idx, bar in enumerate(container):
-            height = bar.get_height()
-            # Format with no decimal places now that we've multiplied by 100
-            labels.append(f'{height:.0f}%')
-            
-            # Calculate position for text inside the bar
-            x_pos = bar.get_x() + bar.get_width()/2
-            y_pos = height/2  # Mid-point of bar
-            
-            # Add the label inside the bar
-            color = 'white' if height > 30 else 'black'  # White text for tall bars, black for short ones
-            fontweight = 'bold'
-            
-            ax.text(x_pos, y_pos, f'{height:.0f}%', 
-                   ha='center', va='center', 
-                   color=color, 
-                   fontsize=base_fontsize,
-                   fontweight=fontweight)    # Add a custom annotation for Female category in Gender chart
-    if name == "Gender":
-        # Find the Female category in the data
-        female_indices = [i for i, cat in enumerate(kpi_melted['Category'].unique()) if cat == 'Female']
+    # Adding value labels dynamically inside or outside the bars
+    base_fontsize = 16
+    threshold = ax.get_ylim()[1] * 0.10
+    
+    for bar in bars.patches:
+        height = bar.get_height()
+        if height == 0:
+            continue
         
-        if female_indices:  # If Female category exists in the data
-            female_index = female_indices[0]
-            
-            # Highlight Female category with a subtle effect
-            for container_idx, container in enumerate(ax.containers):
-                # Get the bar corresponding to Female category
-                bar = container[female_index]  # Female bar in current container
-                
-                # Get bar dimensions
-                height = bar.get_height()
-                x_pos = bar.get_x() + bar.get_width() / 2
-                
-                # Add a subtle highlight effect around the Female bar
-                # Draw a rectangle around the Female bar
-                rect = plt.Rectangle((bar.get_x() - bar.get_width()*0.05, -1), 
-                                    bar.get_width()*1.1, height + 2,
-                                    fill=False, linestyle='--', 
-                                    linewidth=2, edgecolor='red', alpha=0.8, zorder=5)
-                ax.add_patch(rect)
-                  # Add a "Female" text label above the bar (without arrow)
-                if container_idx == 0:  # Only add once
-                    ax.text(x_pos, height + 5, 'Female',
-                           ha='center', fontsize=16, fontweight='bold',
-                           color='darkred',
-                           bbox=dict(boxstyle='round,pad=0.3', 
-                                    fc='white', ec='red', alpha=0.8))
+        label_text = f'{height:.0f}%'
+        x_pos = bar.get_x() + bar.get_width() / 2
+        
+        if height < threshold:
+            y_pos = height
+            color = 'black'
+            ax.text(x_pos, y_pos, label_text,
+                   ha='center', va='bottom',
+                   color=color,
+                   fontsize=base_fontsize,
+                   fontweight='bold',
+                   xytext=(0, 5),
+                   textcoords='offset points')
+        else:
+            y_pos = height / 2
+            color = 'white'
+            ax.text(x_pos, y_pos, label_text,
+                   ha='center', va='center',
+                   color=color,
+                   fontsize=base_fontsize,
+                   fontweight='bold')
 
     # Enhance grid for better readability
     ax.grid(axis='y', linestyle='--', alpha=0.7)
     
-    # Adjust legend with better styling
-    legend = ax.legend(title='Performance Metric', fontsize=14)
-    plt.setp(legend.get_title(), fontsize=16, fontweight='bold')
     # Extend y-axis to provide more space for labels
     extend_y_limits(ax, 0.3)  # Increased from 0.2 to 0.3 to make room for ticks and annotations
     
@@ -445,64 +642,62 @@ def create_performance_multiple_chart(df, name):
     """Create the performance multiple chart."""
     fig, ax = setup_chart_style()
     
-    # Get the 7th and 11th columns (indices 6 and 10)
-    col7 = df.columns[6]
+    # Get the 11th column (index 10)
     col11 = df.columns[10]
 
     # Create shorter column names for display
-    col7_short = "Performance Multiple KPI Combined"
     col11_short = "Performance Multiple KPI 1"
 
     # Create a DataFrame with the data and specified columns
     perf_data = pd.DataFrame({
         'Category': df['Category'],
-        col7_short: df[col7],
         col11_short: df[col11]
     })
 
-    # Reshape data for seaborn
-    perf_melted = pd.melt(perf_data, 
-                          id_vars=['Category'], 
-                          value_vars=[col7_short, col11_short],
-                          var_name='Performance Type', 
-                          value_name='Multiple')    
-    
-    # Using seaborn barplot with grouped bars
-    bars = sns.barplot(x='Category', y='Multiple', hue='Performance Type', 
-                      data=perf_melted, 
-                      palette=['#2ca02c', '#98df8a'], 
+    # Using seaborn barplot
+    bars = sns.barplot(x='Category', y=col11_short, 
+                      data=perf_data, 
+                      palette=['#2ca02c'], 
                       ax=ax, width=0.7)
 
     ax.set_title(f'Performance Multiple by {name}', pad=20)
     ax.set_xlabel(f'{name}', labelpad=15)
-    ax.set_ylabel('Multiple Value', labelpad=15)    # Adding value labels inside the bars with larger font size
-    base_fontsize = 16  # Increased from 13 (20% larger)
-    for container_idx, container in enumerate(ax.containers):
-        for bar in container:
-            height = bar.get_height()
-            
-            # Calculate position for text inside the bar
-            x_pos = bar.get_x() + bar.get_width()/2
-            y_pos = height/2  # Mid-point of bar
-            
-            # Add the label inside the bar
-            label_text = f'{height:.1f}x'
-            color = 'white' if height > 1.5 else 'black'  # White text for tall bars, black for short ones
-            
-            ax.text(x_pos, y_pos, label_text, 
-                   ha='center', va='center', 
-                   color=color, 
+    ax.set_ylabel('Multiple Value', labelpad=15)
+    
+    # Adding value labels dynamically inside or outside the bars
+    base_fontsize = 16
+    threshold = ax.get_ylim()[1] * 0.10
+
+    for bar in bars.patches:
+        height = bar.get_height()
+        if height == 0:
+            continue
+        
+        label_text = f'{height:.1f}x'
+        x_pos = bar.get_x() + bar.get_width() / 2
+
+        if height < threshold:
+            y_pos = height
+            color = 'black'
+            ax.text(x_pos, y_pos, label_text,
+                   ha='center', va='bottom',
+                   color=color,
+                   fontsize=base_fontsize,
+                   fontweight='bold',
+                   xytext=(0, 5),
+                   textcoords='offset points')
+        else:
+            y_pos = height / 2
+            color = 'white'
+            ax.text(x_pos, y_pos, label_text,
+                   ha='center', va='center',
+                   color=color,
                    fontsize=base_fontsize,
                    fontweight='bold')
 
     # Enhance grid for better readability
     ax.grid(axis='y', linestyle='--', alpha=0.7)
     
-    # Adjust legend with better styling
-    legend = ax.legend(title='Multiple Type', fontsize=14)
-    plt.setp(legend.get_title(), fontsize=16, fontweight='bold')
-    # Extend y-axis to provide more space for labels
-    extend_y_limits(ax, 0.2)
     # Extend y-axis to provide more space for labels
     extend_y_limits(ax, 0.2)
     
@@ -538,51 +733,27 @@ def create_top_bottom_performers_chart(df, name):
     """Create the top and bottom performers chart."""
     fig, ax = setup_chart_style()
     
-    # Get the 5th, 6th, 9th and 10th columns (indices 4, 5, 8, 9)
-    col5 = df.columns[4]  # Top performers Combined KPI
-    col6 = df.columns[5]  # Bottom performers Combined KPI
+    # Get the 9th and 10th columns (indices 8, 9)
     col9 = df.columns[8]  # Top performers KPI 1
     col10 = df.columns[9]  # Bottom performers KPI 1
 
     # Create shorter column names for display
-    col5_short = "Top 10% (Combined)"
-    col6_short = "Bottom 10% (Combined)" 
     col9_short = "Top 10% (KPI 1)"
     col10_short = "Bottom 10% (KPI 1)"
 
     # Create a DataFrame with the data and specified columns
     performer_data = pd.DataFrame({
         'Category': df['Category'],
-        col5_short: df[col5],
-        col6_short: df[col6],
         col9_short: df[col9],
         col10_short: df[col10]
     })
 
-    # Reshape data for seaborn - first combine top performers
-    top_performers = pd.melt(performer_data, 
+    # Reshape data for seaborn
+    all_performers = pd.melt(performer_data, 
                          id_vars=['Category'], 
-                         value_vars=[col5_short, col9_short],
-                         var_name='KPI Type', 
+                         value_vars=[col9_short, col10_short],
+                         var_name='Performance', 
                          value_name='Value')
-    top_performers['Performance'] = 'Top 10%'
-    
-    # Ensure unique index to avoid reindexing issues
-    top_performers = top_performers.reset_index(drop=True)
-
-    # Then combine bottom performers
-    bottom_performers = pd.melt(performer_data, 
-                         id_vars=['Category'], 
-                         value_vars=[col6_short, col10_short],
-                         var_name='KPI Type', 
-                         value_name='Value')
-    bottom_performers['Performance'] = 'Bottom 10%'
-    
-    # Ensure unique index to avoid reindexing issues
-    bottom_performers = bottom_performers.reset_index(drop=True)
-
-    # Combine both datasets
-    all_performers = pd.concat([top_performers, bottom_performers], ignore_index=True)    
     
     # Using seaborn barplot with grouped bars with enhanced colors
     bars = sns.barplot(x='Category', y='Value', hue='Performance', 
@@ -592,25 +763,38 @@ def create_top_bottom_performers_chart(df, name):
 
     ax.set_title(f'Top vs Bottom Performers by {name}', pad=20)
     ax.set_xlabel(f'{name}', labelpad=15)
-    ax.set_ylabel('CAP Value', labelpad=15)    # Adding value labels inside bars with larger font
-    base_fontsize = 16  # 20% larger than original 13
-    for container_idx, container in enumerate(ax.containers):
-        for bar_idx, bar in enumerate(container):
+    ax.set_ylabel('CAP Value', labelpad=15)
+    
+    # Adding value labels dynamically inside or outside the bars
+    base_fontsize = 16
+    threshold = ax.get_ylim()[1] * 0.10
+
+    for container in ax.containers:
+        for bar in container:
             height = bar.get_height()
+            if height == 0:
+                continue
             
-            # Calculate position for text inside the bar
-            x_pos = bar.get_x() + bar.get_width()/2
-            y_pos = height/2  # Mid-point of bar
-            
-            # Add the label inside the bar
             label_text = f'{height:.1f}'
-            color = 'white' if container_idx == 0 else 'black'  # Top performers white, bottom black
-            
-            ax.text(x_pos, y_pos, label_text, 
-                   ha='center', va='center', 
-                   color=color, 
-                   fontsize=base_fontsize,
-                   fontweight='bold')
+            x_pos = bar.get_x() + bar.get_width() / 2
+
+            if height < threshold:
+                y_pos = height
+                offset = ax.get_ylim()[1] * 0.02 
+                color = 'black'
+                ax.text(x_pos, y_pos, label_text,
+                       ha='center', va='bottom',
+                       color=color,
+                       fontsize=base_fontsize,
+                       fontweight='bold',)
+            else:
+                y_pos = height / 2
+                color = 'white'
+                ax.text(x_pos, y_pos, label_text,
+                       ha='center', va='center',
+                       color=color,
+                       fontsize=base_fontsize,
+                       fontweight='bold')
 
     # Enhance grid for better readability
     ax.grid(axis='y', linestyle='--', alpha=0.7)
@@ -618,8 +802,7 @@ def create_top_bottom_performers_chart(df, name):
     # Adjust legend with better styling
     legend = ax.legend(title='Performance Group', fontsize=14)
     plt.setp(legend.get_title(), fontsize=16, fontweight='bold')
-    # Extend y-axis to provide more space for labels
-    extend_y_limits(ax, 0.2)
+    
     # Extend y-axis to provide more space for labels
     extend_y_limits(ax, 0.2)
     
@@ -674,16 +857,35 @@ def create_time_to_first_sale_chart(df, name):
 
     ax.set_title(f'Time to Make First Sale by {name}', pad=20)
     ax.set_xlabel(f'{name}', labelpad=15)
-    ax.set_ylabel('Time (months)', labelpad=15)    # Adding value labels inside each bar with increased font size (20% larger)
-    base_fontsize = 16  # Increased from 13 (20% larger)
+    ax.set_ylabel('Time (months)', labelpad=15)    # Adding value labels dynamically inside or outside the bars
+    base_fontsize = 16
+    threshold = ax.get_ylim()[1] * 0.10
+
     for i, container in enumerate(ax.containers):
         for j, bar in enumerate(container):
             height = bar.get_height()
-            if height >= 0.5:  # Only add text if bar is tall enough
-                ax.text(bar.get_x() + bar.get_width()/2, height/2,
-                        f'{height:.2f} months',
+            if height == 0:
+                continue
+            
+            label_text = f'{height:.2f}'
+            x_pos = bar.get_x() + bar.get_width() / 2
+
+            if height < threshold:
+                y_pos = height
+                color = 'black'
+                ax.text(x_pos, y_pos, label_text,
+                        ha='center', va='bottom',
+                        color=color,
+                        fontweight='bold',
+                        fontsize=base_fontsize)
+            else:
+                y_pos = height / 2
+                color = 'white'
+                ax.text(x_pos, y_pos, label_text,
                         ha='center', va='center',
-                        color='white', fontweight='bold', fontsize=base_fontsize)    # Add a horizontal line for the average with larger font size
+                        color=color,
+                        fontweight='bold',
+                        fontsize=base_fontsize)    # Add a horizontal line for the average with larger font size
     avg_time = df[col12].mean()
     ax.axhline(y=avg_time, color='red', linestyle='--', alpha=0.7)
       # Find appropriate empty space for the average label
@@ -753,16 +955,37 @@ def create_car2catpo_ratio_chart(df, name):
 
     ax.set_title(f'CAR2CATPO Ratio by {name}', pad=20)
     ax.set_xlabel(f'{name}', labelpad=15)
-    ax.set_ylabel('Ratio Value', labelpad=15)    # Adding value labels inside the bars with increased font size (20% larger)
-    base_fontsize = 16  # Increased from 13 (20% larger)
+    ax.set_ylabel('Ratio Value', labelpad=15)    # Adding value labels dynamically inside or outside the bars
+    base_fontsize = 16
+    threshold = ax.get_ylim()[1] * 0.10
+
     for i, container in enumerate(ax.containers):
         for j, bar in enumerate(container):
             height = bar.get_height()
-            if height >= 0.3:  # Only add text if bar is tall enough
-                ax.text(bar.get_x() + bar.get_width()/2, height/2,
-                        f'{height:.2f}',
+            if height == 0:
+                continue
+            
+            label_text = f'{height:.2f}'
+            x_pos = bar.get_x() + bar.get_width() / 2
+
+            if height < threshold:
+                y_pos = height
+                color = 'black'
+                ax.text(x_pos, y_pos, label_text,
+                        ha='center', va='bottom',
+                        color=color,
+                        fontweight='bold',
+                        fontsize=base_fontsize,
+                        xytext=(0, 5),
+                        textcoords='offset points')
+            else:
+                y_pos = height / 2
+                color = 'white'
+                ax.text(x_pos, y_pos, label_text,
                         ha='center', va='center',
-                        color='white', fontweight='bold', fontsize=base_fontsize)    # Add a horizontal line for the average with larger font size
+                        color=color,
+                        fontweight='bold',
+                        fontsize=base_fontsize)    # Add a horizontal line for the average with larger font size
     avg_ratio = df[col13].mean()
     ax.axhline(y=avg_ratio, color='red', linestyle='--', alpha=0.7)
       # Find appropriate empty space for the average label
@@ -840,24 +1063,41 @@ def create_attrition_count_chart(df, name):
 
     # Increased font size by 20%
     base_fontsize = 16  # Increased from 13
-      # Add value count and percentage annotations inside the bars
+      # Add value count and percentage annotations dynamically
+    base_fontsize = 16
+    threshold = ax.get_ylim()[1] * 0.10
+
     for i, container in enumerate(ax.containers):
         for j, bar in enumerate(container):
             count = bar.get_height()
-            rate = attrition_rates[j]
+            if count == 0:
+                continue
             
-            if count >= 1:  # Only add text if bar is tall enough
+            rate = attrition_rates[j]
+            x_pos = bar.get_x() + bar.get_width() / 2
+
+            if count < threshold:
+                y_pos = count
+                color = 'black'
+                ax.text(x_pos, y_pos, f'{int(count)} ({rate:.1f}%)',
+                        ha='center', va='bottom',
+                        color=color,
+                        fontweight='bold',
+                        fontsize=base_fontsize,
+                        xytext=(0, 5),
+                        textcoords='offset points')
+            else:
                 # Position for the value at top third of the bar
-                ax.text(bar.get_x() + bar.get_width()/2, count*0.7, 
-                        f'{int(count)}', 
+                ax.text(x_pos, count * 0.7,
+                        f'{int(count)}',
                         ha='center', va='center', color='white',
                         fontweight='bold', fontsize=base_fontsize)
                 
                 # Position for the percentage at bottom third of the bar
-                ax.text(bar.get_x() + bar.get_width()/2, count*0.3, 
-                        f'{rate:.1f}%', 
+                ax.text(x_pos, count * 0.3,
+                        f'({rate:.1f}%)',
                         ha='center', va='center', color='white',
-                        fontweight='bold', fontsize=base_fontsize-2)
+                        fontweight='bold', fontsize=base_fontsize - 2)
                     
     # Enhance grid for better readability
     ax.grid(axis='y', linestyle='--', alpha=0.7)
@@ -933,16 +1173,37 @@ def create_average_residency_chart(df, name):
 
     ax.set_title(f'Employment Tenure by {name}', pad=20)
     ax.set_xlabel(f'{name}', labelpad=15)
-    ax.set_ylabel('Average Tenure (months)', labelpad=15)    # Adding value labels inside each bar with increased font size (20% larger)
-    base_fontsize = 16  # Increased from 13 (20% larger)
+    ax.set_ylabel('Average Tenure (months)', labelpad=15)    # Adding value labels dynamically inside or outside the bars
+    base_fontsize = 16
+    threshold = ax.get_ylim()[1] * 0.10
+
     for container_idx, container in enumerate(ax.containers):
         for bar_idx, bar in enumerate(container):
             height = bar.get_height()
-            if height >= 1.0:  # Only add text if bar is tall enough
-                ax.text(bar.get_x() + bar.get_width()/2, height/2,
-                        f'{height:.2f}',
+            if height == 0:
+                continue
+            
+            label_text = f'{height:.2f}'
+            x_pos = bar.get_x() + bar.get_width() / 2
+
+            if height < threshold:
+                y_pos = height
+                color = 'black'
+                ax.text(x_pos, y_pos, label_text,
+                        ha='center', va='bottom',
+                        color=color,
+                        fontweight='bold',
+                        fontsize=base_fontsize,
+                        xytext=(0, 5),
+                        textcoords='offset points')
+            else:
+                y_pos = height / 2
+                color = 'white'
+                ax.text(x_pos, y_pos, label_text,
                         ha='center', va='center',
-                        color='white', fontweight='bold', fontsize=base_fontsize)    # Add horizontal line for overall average tenure for all employees with larger font size
+                        color=color,
+                        fontweight='bold',
+                        fontsize=base_fontsize)    # Add horizontal line for overall average tenure for all employees with larger font size
     overall_avg = df[col15].mean()
     ax.axhline(y=overall_avg, color='red', linestyle='--', alpha=0.7)
     
@@ -1015,16 +1276,37 @@ def create_infant_attrition_chart(df, name):
 
     ax.set_title(f'Infant Attrition Rate by {name}', pad=20)
     ax.set_xlabel(f'{name}', labelpad=15)
-    ax.set_ylabel('Attrition Rate (%)', labelpad=15)    # Adding value labels inside the bars with increased font size (20% larger)
-    base_fontsize = 16  # Increased from 13 (20% larger)
+    ax.set_ylabel('Attrition Rate (%)', labelpad=15)    # Adding value labels dynamically inside or outside the bars
+    base_fontsize = 16
+    threshold = ax.get_ylim()[1] * 0.10
+
     for i, container in enumerate(ax.containers):
         for j, bar in enumerate(container):
             height = bar.get_height()
-            if height >= 2.0:  # Only add text if bar is tall enough
-                ax.text(bar.get_x() + bar.get_width()/2, height/2,
-                        f'{height:.1f}%',
+            if height == 0:
+                continue
+            
+            label_text = f'{height:.1f}%'
+            x_pos = bar.get_x() + bar.get_width() / 2
+
+            if height < threshold:
+                y_pos = height
+                color = 'black'
+                ax.text(x_pos, y_pos, label_text,
+                        ha='center', va='bottom',
+                        color=color,
+                        fontweight='bold',
+                        fontsize=base_fontsize,
+                        xytext=(0, 5),
+                        textcoords='offset points')
+            else:
+                y_pos = height / 2
+                color = 'white'
+                ax.text(x_pos, y_pos, label_text,
                         ha='center', va='center',
-                        color='white', fontweight='bold', fontsize=base_fontsize)    # Add a horizontal line for the average with larger font size
+                        color=color,
+                        fontweight='bold',
+                        fontsize=base_fontsize)    # Add a horizontal line for the average with larger font size
     avg_attrition = infant_attrition_data['Infant Attrition'].mean()
     ax.axhline(y=avg_attrition, color='red', linestyle='--', alpha=0.7)
       # Find appropriate empty space for the average label
