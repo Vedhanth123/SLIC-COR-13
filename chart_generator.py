@@ -19,7 +19,9 @@ class ChartGenerator:
             plot_bgcolor='rgba(249,249,249,1)',
             paper_bgcolor='rgba(255,255,255,1)',
             yaxis=dict(gridcolor='rgba(220,220,220,0.5)'),
-            legend_title_text=''
+            legend_title_text='',
+            bargap=0.1,
+            xaxis_tickangle=-45,
         )
         return fig
 
@@ -66,7 +68,7 @@ class ChartGenerator:
         col = df.columns[11]
         first_sale_data = pd.DataFrame({'Category': df['Category'], 'Time to First Sale': df[col]})
         
-        fig = self._get_base_fig(first_sale_data, x='Category', y='Time to First Sale', title=f'Time to Make First Sale by {name}', color='Category', text_auto='.2f')
+        fig = self._get_base_fig(first_sale_data, x='Category', y='Time to First Sale', title=f'Time to Make First Sale by {name}', text_auto='.2f')
         avg_time = df[col].mean()
         # self._add_average_line(fig, avg_time, f'Average: {avg_time:.2f} months')
         fig.update_layout(showlegend=False)
@@ -76,7 +78,7 @@ class ChartGenerator:
         col = df.columns[12]
         ratio_data = pd.DataFrame({'Category': df['Category'], 'CAR2CATPO Ratio': df[col]})
 
-        fig = self._get_base_fig(ratio_data, x='Category', y='CAR2CATPO Ratio', title=f'CAR2CATPO Ratio by {name}', color='Category', text_auto='.2f')
+        fig = self._get_base_fig(ratio_data, x='Category', y='CAR2CATPO Ratio', title=f'CAR2CATPO Ratio by {name}', text_auto='.2f')
         avg_ratio = df[col].mean()
         # self._add_average_line(fig, avg_ratio, f'Average: {avg_ratio:.2f}')
         fig.update_layout(showlegend=False)
@@ -90,7 +92,7 @@ class ChartGenerator:
         # Create a custom text string for the label, using <br> for a new line in HTML
         attrition_data['text_label'] = [f"{count}<br>({rate:.1f}%)" for count, rate in zip(attrition_data['Attrited Employees'], attrition_data['rate'])]
         
-        fig = self._get_base_fig(attrition_data, x='Category', y='Attrited Employees', title=f'Employee Attrition by {name}', color='Category', text_auto=False)
+        fig = self._get_base_fig(attrition_data, x='Category', y='Attrited Employees', title=f'Employee Attrition by {name}', text_auto=False)
         fig.update_traces(text=attrition_data['text_label'], textposition='inside')
         fig.update_layout(showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
@@ -109,7 +111,7 @@ class ChartGenerator:
         col = df.columns[16]
         infant_attrition_data = pd.DataFrame({'Category': df['Category'], 'Infant Attrition': df[col] * 100})
 
-        fig = self._get_base_fig(infant_attrition_data, x='Category', y='Infant Attrition', title=f'Infant Attrition Rate by {name}', color='Category', text_auto='.1f')
+        fig = self._get_base_fig(infant_attrition_data, x='Category', y='Infant Attrition', title=f'Infant Attrition Rate by {name}', text_auto='.1f')
         fig.update_traces(texttemplate='%{y:.1f}%')
         avg_attrition = infant_attrition_data['Infant Attrition'].mean()
         # self._add_average_line(fig, avg_attrition, f'Average: {avg_attrition:.1f}%')
