@@ -68,7 +68,7 @@ class ChartGenerator:
         col = df.columns[7]
         first_sale_data = pd.DataFrame({'Category': df['Category'], 'Time to First Sale': df[col]})
         
-        fig = self._get_base_fig(first_sale_data, x='Category', y='Time to First Sale (in months)', title=f'Time to Make First Sale (in months) by {name}', text_auto='.2f')
+        fig = self._get_base_fig(first_sale_data, x='Category', y='Time to First Sale', title=f'Time to Make First Sale (in months) by {name}', text_auto='.2f')
         avg_time = df[col].mean()
         # self._add_average_line(fig, avg_time, f'Average: {avg_time:.2f} months')
         fig.update_layout(showlegend=False)
