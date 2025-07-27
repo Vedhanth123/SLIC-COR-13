@@ -43,21 +43,21 @@ class ChartGenerator:
         st.plotly_chart(fig, use_container_width=True)
 
     def create_kpi_performance_chart(self, df, name):
-        kpi_data = pd.DataFrame({'Category': df['Category'], 'Achievement %': df[df.columns[7]] * 100})
+        kpi_data = pd.DataFrame({'Category': df['Category'], 'Achievement %': df[df.columns[3]] * 100})
         
         fig = self._get_base_fig(kpi_data, x='Category', y='Achievement %', title=f'KPI 1 Performance by {name} CAP LRM', color_discrete_sequence=['#ff7f0e'])
         fig.update_traces(texttemplate='%{y:.0f}%', textposition='auto')
         st.plotly_chart(fig, use_container_width=True)
 
     def create_performance_multiple_chart(self, df, name):
-        perf_data = pd.DataFrame({'Category': df['Category'], 'Multiple': df[df.columns[10]]})
+        perf_data = pd.DataFrame({'Category': df['Category'], 'Multiple': df[df.columns[6]]})
         
         fig = self._get_base_fig(perf_data, x='Category', y='Multiple', title=f'Performance Multiple by {name}', color_discrete_sequence=['#2ca02c'])
         fig.update_traces(texttemplate='%{y:.1f}x', textposition='auto')
         st.plotly_chart(fig, use_container_width=True)
 
     def create_top_bottom_performers_chart(self, df, name):
-        performer_data = pd.DataFrame({'Category': df['Category'], 'Top 10% (KPI 1)': df[df.columns[8]], 'Bottom 10% (KPI 1)': df[df.columns[9]]})
+        performer_data = pd.DataFrame({'Category': df['Category'], 'Top 10% (KPI 1)': df[df.columns[4]], 'Bottom 10% (KPI 1)': df[df.columns[5]]})
         all_performers = pd.melt(performer_data, id_vars=['Category'], var_name='Performance', value_name='Value')
         
         fig = self._get_base_fig(all_performers, x='Category', y='Value', color='Performance', title=f'Top vs Bottom Performers by {name}')
@@ -65,17 +65,17 @@ class ChartGenerator:
         st.plotly_chart(fig, use_container_width=True)
 
     def create_time_to_first_sale_chart(self, df, name):
-        col = df.columns[11]
+        col = df.columns[7]
         first_sale_data = pd.DataFrame({'Category': df['Category'], 'Time to First Sale': df[col]})
         
-        fig = self._get_base_fig(first_sale_data, x='Category', y='Time to First Sale', title=f'Time to Make First Sale by {name}', text_auto='.2f')
+        fig = self._get_base_fig(first_sale_data, x='Category', y='Time to First Sale (in months)', title=f'Time to Make First Sale (in months) by {name}', text_auto='.2f')
         avg_time = df[col].mean()
         # self._add_average_line(fig, avg_time, f'Average: {avg_time:.2f} months')
         fig.update_layout(showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
 
     def create_car2catpo_ratio_chart(self, df, name):
-        col = df.columns[12]
+        col = df.columns[8]
         ratio_data = pd.DataFrame({'Category': df['Category'], 'CAR2CATPO Ratio': df[col]})
 
         fig = self._get_base_fig(ratio_data, x='Category', y='CAR2CATPO Ratio', title=f'CAR2CATPO Ratio by {name}', text_auto='.2f')
@@ -85,7 +85,7 @@ class ChartGenerator:
         st.plotly_chart(fig, use_container_width=True)
 
     def create_attrition_count_chart(self, df, name):
-        col14 = df.columns[13]
+        col14 = df.columns[9]
         attrition_data = pd.DataFrame({'Category': df['Category'], 'Attrited Employees': df[col14]})
         total_per_category = df['CAP LRM cohort'].values
         attrition_data['rate'] = (attrition_data['Attrited Employees'] / total_per_category) * 100
@@ -98,7 +98,7 @@ class ChartGenerator:
         st.plotly_chart(fig, use_container_width=True)
 
     def create_average_residency_chart(self, df, name):
-        col15, col16 = df.columns[14], df.columns[15]
+        col15, col16 = df.columns[10], df.columns[11]
         residency_data = pd.DataFrame({'Category': df['Category'], "All Employees": df[col15], "Top 100 Performers": df[col16]})
         residency_melted = pd.melt(residency_data, id_vars=['Category'], var_name='Employee Group', value_name='Average Residency')
 
@@ -108,7 +108,7 @@ class ChartGenerator:
         st.plotly_chart(fig, use_container_width=True)
 
     def create_infant_attrition_chart(self, df, name):
-        col = df.columns[16]
+        col = df.columns[12]
         infant_attrition_data = pd.DataFrame({'Category': df['Category'], 'Infant Attrition': df[col] * 100})
 
         fig = self._get_base_fig(infant_attrition_data, x='Category', y='Infant Attrition', title=f'Infant Attrition Rate by {name}', text_auto='.1f')
@@ -119,7 +119,7 @@ class ChartGenerator:
         st.plotly_chart(fig, use_container_width=True)
 
     def create_retention_chart(self, df, name):
-        cols = { "Retention at CAP 3": df.columns[22], "Retention at CAP 6": df.columns[23], "Retention at CAP 9": df.columns[24], "Retention at CAP 12": df.columns[25]}
+        cols = { "Retention at CAP 3": df.columns[18], "Retention at CAP 6": df.columns[19], "Retention at CAP 9": df.columns[20], "Retention at CAP 12": df.columns[21]}
         data = pd.DataFrame({'Category': df['Category']})
         for short_name, col_name in cols.items():
             data[short_name] = df[col_name] * 100
@@ -130,7 +130,7 @@ class ChartGenerator:
         st.plotly_chart(fig, use_container_width=True)
 
     def create_cost_of_hire_chart(self, df, name):
-        cols = {"Cost of Wrong Hire": df.columns[20], "Cost of Back Fill": df.columns[21]}
+        cols = {"Cost of Wrong Hire": df.columns[16], "Cost of Back Fill": df.columns[17]}
         data = pd.DataFrame({'Category': df['Category']})
         for short_name, col_name in cols.items():
             data[short_name] = df[col_name]
