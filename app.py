@@ -122,7 +122,7 @@ class DashboardApp:
         selected_charts = st.multiselect(
             '📊 Select visualizations to display:',
             options=CHART_OPTIONS,
-            default=['Distribution', 'KPI Performance', 'Performance Multiple', 'Top vs Bottom Performers', 'Time to First Sale', 'CAR2CATPO Ratio', 'Attrition Count', 'Average Residency', 'Infant Attrition', 'Cost of Hire']
+            default=['Distribution', 'KPI Performance', 'Performance Multiple', 'Top vs Bottom Performers', 'Time to First Sale', 'CAR2CATPO Ratio', 'Average Residency', 'Cost of Hire', 'Attrition Count']
         )
         
         chart_functions = {
