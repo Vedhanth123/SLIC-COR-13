@@ -36,9 +36,9 @@ class ChartGenerator:
 
     def create_distribution_chart(self, df, name):
         cols = df.columns[:3]
-        df_melted = pd.melt(df, id_vars=[cols[0]], value_vars=[cols[1], cols[2]], var_name='Metric', value_name='Count')
+        df_melted = pd.melt(df, id_vars=[cols[0]], value_vars=[cols[1], cols[2]], var_name='Metric', value_name='Head Count')
         
-        fig = self._get_base_fig(df_melted, x='Category', y='Count', color='Metric', title=f'{name} Distribution by Cohort')
+        fig = self._get_base_fig(df_melted, x='Category', y='Head Count', color='Metric', title=f'{name} Distribution by Cohort')
         fig.update_traces(texttemplate='%{y:.0f}', textposition='inside')
         st.plotly_chart(fig, use_container_width=True)
 
@@ -57,11 +57,20 @@ class ChartGenerator:
         st.plotly_chart(fig, use_container_width=True)
 
     def create_top_bottom_performers_chart(self, df, name):
-        performer_data = pd.DataFrame({'Category': df['Category'], 'Top 10% (KPI 1)': df[df.columns[4]], 'Bottom 10% (KPI 1)': df[df.columns[5]]})
+        performer_data = pd.DataFrame({
+            'Category': df['Category'], 
+            'Top 10% (KPI 1)': df[df.columns[4]] * 100,
+            'Bottom 10% (KPI 1)': df[df.columns[5]] * 100
+        })
         all_performers = pd.melt(performer_data, id_vars=['Category'], var_name='Performance', value_name='Value')
         
         fig = self._get_base_fig(all_performers, x='Category', y='Value', color='Performance', title=f'Top vs Bottom Performers by {name}')
-        fig.update_traces(texttemplate='%{y:.1f}', textposition='auto')
+        
+        # Set the custom y-axis title
+        fig.update_layout(yaxis_title="Achievement %") # 👈 Add this line
+        
+        fig.update_traces(texttemplate='%{y:.0f}%', textposition='auto')
+        
         st.plotly_chart(fig, use_container_width=True)
 
     def create_time_to_first_sale_chart(self, df, name):
@@ -100,9 +109,9 @@ class ChartGenerator:
     def create_average_residency_chart(self, df, name):
         col15, col16 = df.columns[10], df.columns[11]
         residency_data = pd.DataFrame({'Category': df['Category'], "All Employees": df[col15], "Top 100 Performers": df[col16]})
-        residency_melted = pd.melt(residency_data, id_vars=['Category'], var_name='Employee Group', value_name='Average Residency')
+        residency_melted = pd.melt(residency_data, id_vars=['Category'], var_name='Employee Group', value_name='Average Residency in months')
 
-        fig = self._get_base_fig(residency_melted, x='Category', y='Average Residency', color='Employee Group', title=f'Employment Tenure by {name}', text_auto='.2f')
+        fig = self._get_base_fig(residency_melted, x='Category', y='Average Residency in months', color='Employee Group', title=f'Employment Tenure by {name}', text_auto='.2f')
         overall_avg = df[col15].mean()
         # self._add_average_line(fig, overall_avg, f'Average: {overall_avg:.2f}')
         st.plotly_chart(fig, use_container_width=True)
@@ -130,11 +139,31 @@ class ChartGenerator:
         st.plotly_chart(fig, use_container_width=True)
 
     def create_cost_of_hire_chart(self, df, name):
-        cols = {"Cost of Wrong Hire": df.columns[16], "Cost of Back Fill": df.columns[17]}
-        data = pd.DataFrame({'Category': df['Category']})
-        for short_name, col_name in cols.items():
-            data[short_name] = df[col_name]
-        melted = pd.melt(data, id_vars=['Category'], var_name='Cost Type', value_name='Cost of Hire')
+        # Using column names is safer than indices. Let's find the correct names from your list.
+        # Assuming the names are 'COST Of WRONG HIRE...' and 'COST Of BACK FILL...'
+        cost_wrong_hire_col = 'COST Of WRONG HIRE  - cost of under eprformances of ATTRITTED  under prformers  in Cohort LRM'
+        cost_back_fill_col = 'COST Of BACK FILL - cost of  under prformances of all employees in  in Cohort LRM'
+
+        # Check if columns exist
+        if not all(col in df.columns for col in [cost_wrong_hire_col, cost_back_fill_col]):
+            st.warning(f"Cost of Hire chart cannot be generated for '{name}' due to missing columns.")
+            return
+
+        data = pd.DataFrame({
+            'Category': df['Category'],
+            'Cost of Wrong Hire': df[cost_wrong_hire_col],
+            'Cost of Back Fill': df[cost_back_fill_col]
+        })
         
-        fig = self._get_base_fig(melted, x='Category', y='Cost of Hire', color='Cost Type', title=f'Cost of Hire by {name}', text_auto='.1f')
+        melted = pd.melt(data, id_vars=['Category'], var_name='Cost Type', value_name='Months of Salary')
+        
+        # We removed text_auto from this call
+        fig = self._get_base_fig(melted, x='Category', y='Months of Salary', color='Cost Type', title=f'Cost of Hire (months of salary) by {name}')
+        
+        # 1. Add this line to set a custom text format
+        fig.update_traces(texttemplate='%{y:.1f} months', textposition='auto')
+
+        # 2. Update the y-axis title
+        fig.update_layout(yaxis_title="Months of Salary")
+        
         st.plotly_chart(fig, use_container_width=True)
